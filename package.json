@@ -2,14 +2,30 @@
   "name": "proyectofinalbe2coderhouse",
   "version": "1.0.0",
   "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nehuelin/ProyectoFinalBE2Coderhouse.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Nehuelin/ProyectoFinalBE2Coderhouse/issues"
+  },
+  "homepage": "https://github.com/Nehuelin/ProyectoFinalBE2Coderhouse#readme",
   "description": "",
   "dependencies": {
-    "express": "^5.2.1"
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-handlebars": "^8.0.1",
+    "mongoose": "^9.7.4"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
   }
 }
