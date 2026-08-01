@@ -13,7 +13,7 @@ app.use(express.json())
 connectDB()
 
 // app.use('/api/users', usersRouter)
-app.use('/api/session', sessionsRouter)
+app.use('/api/sessions', sessionsRouter)
 // app.use('/api/tickets', ticketsRouter)
 app.use('/api/events', eventsRouter)
 

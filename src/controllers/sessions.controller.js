@@ -1,10 +1,30 @@
-export const getSession = async (req, res) => {
+import sessionsService from "../services/sessions.service.js";
+import { createHash, isValidPassword } from "../utils/hash.js";
+
+export const register = async (req, res) => {
   try {
-    res.json({
+    const result = await sessionsService.register(req.body);
+    
+    res.status(201).json({
       status: 'success',
-      sessionToken: 'abc123'
-    })
+      message: 'Usuario registrado correctamente',
+      payload: result
+    });
+
   } catch (error) {
-    res.status(500).json({ error: 'Error al obtener el token de sesion' })
-  }
-}
+    if (error.message === "EMAIL_EXISTS") {
+
+      return res.status(409).json({
+        status: 'error',
+        message: 'Ya existe un usuario registrado con ese email'
+      });
+
+    } else {
+
+      return res.status(400).json({
+        status: 'error',
+        message: error.message
+      })
+    }
+  };
+};

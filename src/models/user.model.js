@@ -4,16 +4,20 @@ const userSchema = new mongoose.Schema(
   {
     first_name: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
     last_name: {
       type: String,
-      required: true
+      required: true,
+      trim: true
     },
     email: {
       type: String,
       required: true,
-      unique: true
+      unique: true,
+      lowercase: true,
+      trim: true
     },
     password: {
       type: String,
@@ -21,11 +25,12 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      default: 'user', // 'user', 'organizer', 'admin'
+      enum: ['admin', 'organizer', 'user'],
+      default: 'user',
     }
   },
   {
     timestamps: true
   }
 )
-export const UserModel = mongoose.model('User', userSchema)
+export default mongoose.model('User', userSchema);

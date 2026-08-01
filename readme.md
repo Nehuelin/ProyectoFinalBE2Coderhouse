@@ -1,4 +1,4 @@
-# Proyecto Final Coderhouse - Backend II (Pre-Entrega 1)
+# Proyecto Final Coderhouse - Backend II (Pre-Entrega 2)
 
 ## Nombre del Proyecto
 ParkEvent Solutions
@@ -127,9 +127,11 @@ Las rutas disponibles al momento de escribir este readme son las siguientes:
 | Método | Ruta | Estado HTTP | Descripción |
 | --- | --- | :---: | --- |
 | `GET` | `/api/health` | `200` | Comprueba que el servidor esté activo. |
-| `GET` | `/api/session` | `200` | Devuelve un token de sesión de ejemplo. No autentica usuarios todavía. |
 | `GET` | `/api/events` | `200` | Devuelve la colección inicial de eventos; actualmente es un arreglo vacío. |
 | `POST` | `/api/events` | `200` | Endpoint preliminar para crear un evento; aún no valida ni persiste el cuerpo enviado. |
+| `GET` | `/api/sessions` | `200` | Devuelve un token de sesión de ejemplo. No autentica usuarios todavía. |
+| `POST` | `/api/sessions/register` | `201` | Registra un usuario nuevo en el sistema. El mail provisto NO debe existir en la base de datos, y la contraseña debe tener al menos 8 caracteres. |
+
 
 ### Ejemplos
 
@@ -144,3 +146,35 @@ Listar eventos:
 Probar el endpoint preliminar de creación:
 
 ![alt text](/docs/images/create-event.png)
+
+## Como registrar un usuario nuevo en el sistema
+
+Para registrar un nuevo usuario en el sistema se debe utilizar el siguiente endpoint:
+
+`POST /api/sessions/register`
+
+El endpoint espera los siguiente campos:
+```
+{
+   "first_name": "Primer nombre"
+   "last_name": "Apellido"
+   "email": "mimail@mail.com"
+   "password": "unacontraseña123"
+}
+```
+El sistema tiene las siguientes validaciones de seguridad:
+
+- El mail debe tener un formato acorde.
+- El mail ingresado no debe existir en la base de datos.
+- La contraseña debe tener al menos 8 (ocho) caracteres.
+- Se deben completar TODOS los campos.
+
+Si no se cumple alguna de las validaciones el sistema tirará error y no se creará el usuario.
+
+Ejemplo de registro
+
+![alt text](/docs/images/user-register-ok.png)
+
+Evidencia de creación de usuario en MongoDB
+
+![alt text](/docs/images/mongodb-user-creation.png)
