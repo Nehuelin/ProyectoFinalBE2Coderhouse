@@ -1,4 +1,4 @@
-# Proyecto Final Coderhouse - Backend II (Pre-Entrega 2)
+# Proyecto Final Coderhouse - Backend II (Pre-Entrega 3)
 
 ## Nombre del Proyecto
 ParkEvent Solutions
@@ -53,8 +53,9 @@ Se eligió la gestión de eventos dentro de parques tematicos. Esto incluye show
 | --- | :---: | --- | --- |
 | `PORT` | Sí | `8080` | Puerto en el que escucha el servidor HTTP. |
 | `MONGO_URL` | Sí | `mongodb://127.0.0.1:27017/eventos` | URI de conexión a MongoDB. |
-| `NODE_ENV` | No | `development` | Identifica el entorno. Está preparada para configuración futura, pero todavía no modifica el comportamiento de la aplicación. |
-| `JWT_SECRET` | No | `una-clave-segura` | Se utilizará para firmar tokens JWT. La autenticación JWT aún no está implementada. |
+| `NODE_ENV` | Sí | `development` | Identifica el entorno. Se utiliza para aumentar la seguridad de los tokens JWT cuando su valor es `production`. |
+| `JWT_SECRET_KEY` | Sí | `una-clave-segura` | Se utilizará para firmar tokens JWT. |
+| `JWT_EXPIRES_IN` | Sí | `1h` | Se utilizará para establecer el tiempo de vigencia de los tokens JWT. |
 
 Ejemplo de `.env` para desarrollo local:
 
@@ -62,10 +63,11 @@ Ejemplo de `.env` para desarrollo local:
 PORT=8080
 NODE_ENV=development
 MONGO_URL=mongodb://127.0.0.1:27017/eventos
-JWT_SECRET=reemplazar-por-un-secreto-seguro
+JWT_SECRET_KEY=reemplazar-por-un-secreto-seguro
+JWT_EXPIRES_IN=1h
 ```
 
-> La aplicación intenta conectarse a MongoDB al iniciarse. Si la conexión falla, registra el error en la consola; la persistencia de los endpoints todavía no está implementada en esta pre-entrega.
+> La aplicación intenta conectarse a MongoDB al iniciarse. Si la conexión falla, registra el error en la consola.
 
 ## Ejecución
 ### Desarrollo
@@ -90,8 +92,7 @@ Respuesta esperada:
   "message": "Servidor activo"
 }
 ```
-Tambien se puede probar en apps dedicadas a endpoints como Insomnia o Postman
-Por ejemplo:
+Tambien se puede probar en apps dedicadas a endpoints como Insomnia o Postman. Por ejemplo:
 
 ![alt text](/docs/images/api-health.png)
 
@@ -116,8 +117,6 @@ Por ejemplo:
 └── package-lock.json   
 ```
 
-Los recursos de usuarios y tickets ya cuentan con archivos base, pero sus rutas no están habilitadas. Las carpetas `dao`, `repositories` y `services`, así como algunas utilidades, son parte de la estructura prevista para las próximas entregas.
-
 ## Rutas disponibles
 
 URL base local de ejemplo: `http://localhost:8080`.
@@ -131,13 +130,11 @@ Las rutas disponibles al momento de escribir este readme son las siguientes:
 | `POST` | `/api/events` | `200` | Endpoint preliminar para crear un evento; aún no valida ni persiste el cuerpo enviado. |
 | `GET` | `/api/sessions` | `200` | Devuelve un token de sesión de ejemplo. No autentica usuarios todavía. |
 | `POST` | `/api/sessions/register` | `201` | Registra un usuario nuevo en el sistema. El mail provisto NO debe existir en la base de datos, y la contraseña debe tener al menos 8 caracteres. |
-
+| `POST` | `/api/sessions/login` | `200` | Verifica las credenciales dadas y si son correctas devuelve el token de sesión para el usuario mediante cookies. |
+| `GET` | `/api/sessions/current` | `200` | Verifica las cookies de sesion para mostrar datos del usuario que tiene la sesión actual  |
+| `POST` | `/api/sessions/logout` | `200` | Elimina las cookies de sesión actual, sacando al usuario de la sesión |
 
 ### Ejemplos
-
-Obtener la sesión de ejemplo:
-
-![alt text](/docs/images/get-user-session-token.png)
 
 Listar eventos:
 
@@ -178,3 +175,33 @@ Ejemplo de registro
 Evidencia de creación de usuario en MongoDB
 
 ![alt text](/docs/images/mongodb-user-creation.png)
+
+## Proceso de login / logout
+
+Si el usuario está registrado en el sistema entonces debería poder loguearse poniendo su mail y contraseña.
+
+![alt text](/docs/images/user-login-ok.png)
+
+Si el login es exitoso entonces se creará una cookie que contendrá el token de sesión del usuario. 
+
+![alt text](/docs/images/session-cookie-creation.png)
+
+Si se intenta loguear con email o contraseñas incorrectas, se mostrará un mensaje genérico para prevenir ataques pasivos (como análisis de emails existentes en la base de datos).
+
+![alt text](/docs/images/user-login-error.png)
+
+El endpoint GET sessions/current permite obtener información sobre la sesión actual, incluida información sobre el usuario logueado actualmente. Esta información es obtenida a partir de la cookie creada en el proceso de login.
+
+![alt text](/docs/images/get-user-session-token.png)
+
+Si no se tiene el token, o el mismo está expirado o fue alterado (es decir, es invalido), entonces se mostrará un mensaje genérico de error.
+
+![alt text](/docs/images/get-user-session-token-error.png)
+
+Para hacer logout se utiliza el endpoint POST sessions/logout. Este endpoint borra la cookie creada con el login.
+
+![alt text](/docs/images/user-logout.png)
+
+Como se puede ver, la cookie ya no posee un valor, por lo que el token fue eliminado exitosamente.
+
+![alt text](/docs/images/session-cookie-deletion.png)

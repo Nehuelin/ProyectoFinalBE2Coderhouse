@@ -1,4 +1,5 @@
 import express from 'express'
+import cookieParser from 'cookie-parser'
 import { connectDB } from './config/database.js'
 import 'dotenv/config'
 // import usersRouter from './routes/users.routes.js'
@@ -11,6 +12,8 @@ const app = express()
 app.use(express.json())
 
 connectDB()
+
+app.use(cookieParser());
 
 // app.use('/api/users', usersRouter)
 app.use('/api/sessions', sessionsRouter)

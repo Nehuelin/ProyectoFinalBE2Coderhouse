@@ -1,5 +1,6 @@
 import usersRepository from "../repositories/users.repository.js";
-import { createHash } from "../utils/hash.js";
+import { createHash, isValidPassword } from "../utils/hash.js";
+import { generateToken } from "../utils/jwt.js";
 
 class SessionsService {
   async register(data) {
@@ -39,6 +40,41 @@ class SessionsService {
       last_name: newUser.last_name,
       email: newUser.email,
       role: newUser.role,
+    };
+  }
+
+  async login(data) {
+    const { email, password } = data;
+
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!isValidEmail(normalizedEmail)) {
+      throw new Error("El formato del email no es válido");
+    }
+
+    const user = await usersRepository.getByEmail(normalizedEmail);
+
+    if (!user){
+      throw new Error("INVALID_CREDENTIALS");
+    }
+
+    const validPassword = await isValidPassword(password, user.password);
+
+    if (!validPassword){
+      throw new Error("INVALID_CREDENTIALS");
+    }
+
+    // vvvvv user credentials are ok past this point vvvv
+    const tokenUser = {
+      id: user._id,
+      email: user.email,
+      role: user.role,
+    }
+
+    const token = generateToken(tokenUser); 
+    
+    return {
+      token: token
     };
   }
 }
