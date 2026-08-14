@@ -1,11 +1,8 @@
 import passport from 'passport'
 import { Strategy as LocalStrategy } from 'passport-local'
 import { Strategy as JwTStrategy, ExtractJwt } from 'passport-jwt'
-import UserModel from '../models/user.model.js'
-import usersDao from '../dao/users.dao.js'
-import { createHash, isValidPassword } from '../utils/hash.js'
+import { isValidPassword } from '../utils/hash.js'
 import userService from '../services/user.service.js'
-import { verifyToken } from '../utils/jwt.js'
 import usersRepository from '../repositories/users.repository.js'
 import { isValidEmail, normalizeEmail } from '../utils/emailFunctions.js'
 
@@ -13,7 +10,8 @@ import { isValidEmail, normalizeEmail } from '../utils/emailFunctions.js'
 passport.use("register", new LocalStrategy({
     usernameField: "email",
     passwordField: "password",
-    passReqToCallback: true      
+    passReqToCallback: true,
+    badRequestMessage: "Todos los campos son obligatorios"
   },
 
   async (req, incomingEmail, password, done) => {
@@ -21,21 +19,20 @@ passport.use("register", new LocalStrategy({
       const {first_name, last_name} = req.body;
 
       if (!first_name || !last_name || !incomingEmail || !password) {
-        return done(null, false, {message: "Todos los campos son obligatorios"});
+        return done(null, false, {statusCode: 400, message: "Todos los campos son obligatorios"});
       }
 
       const normalizedEmail = normalizeEmail(incomingEmail);
 
       if (!isValidEmail(normalizedEmail)) {
-        return done(null, false, {message: "El formato del email no es válido"});
+        return done(null, false, {statusCode: 400, message: "El formato del email no es válido"});
       }
 
       if (password.length < 8) {
-        return done(null, false, {message: "La contraseña debe tener al menos 8 caracteres"});
+        return done(null, false, {statusCode: 400, message: "La contraseña debe tener al menos 8 caracteres"});
       }
 
       const email = normalizedEmail;
-      console.log("wee woo pog")
       
       const newUser = await userService.registerUser({ first_name, last_name, email, password });
 
@@ -44,7 +41,7 @@ passport.use("register", new LocalStrategy({
     } catch (error) {
       
       if (error.message === "EMAIL_EXISTS"){
-        return done(null, false, {message: "Ya existe un usuario registrado con ese email"});
+        return done(null, false, {statusCode: 409, message: "Ya existe un usuario registrado con ese email"});
       }
 
       return done(error);
@@ -55,6 +52,7 @@ passport.use("register", new LocalStrategy({
 passport.use("login", new LocalStrategy({
     usernameField: "email",
     passwordField: "password",
+    badRequestMessage: "Email y contraseña son obligatorios"
   },
 
   async (email, password, done) => {
@@ -62,19 +60,19 @@ passport.use("login", new LocalStrategy({
       const normalizedEmail = normalizeEmail(email);
   
       if (!isValidEmail(normalizedEmail)) {
-        return done(null, false, { message: "El formato del email no es válido"})
+        return done(null, false, {statusCode: 400, message: "El formato del email no es válido"})
       }
   
       const user = await usersRepository.getByEmail(normalizedEmail);
   
       if (!user){
-        return done(null, false, { message: "Credenciales invalidas"});
+        return done(null, false, {statusCode: 401, message: "Credenciales invalidas"});
       }
   
       const validPassword = await isValidPassword(password, user.password);
   
       if (!validPassword){
-        return done(null, false, { message: "Credenciales invalidas"});
+        return done(null, false, {statusCode: 401, message: "Credenciales invalidas"});
       }
   
       return done(null, user);

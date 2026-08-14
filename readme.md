@@ -1,4 +1,4 @@
-# Proyecto Final Coderhouse - Backend II (Pre-Entrega 3)
+# Proyecto Final Coderhouse - Backend II (Pre-Entrega 4)
 
 ## Nombre del Proyecto
 ParkEvent Solutions
@@ -149,11 +149,84 @@ Probar el endpoint preliminar de creación:
 
 Para los procesos de registro, login, sesión y logout se utiliza **passport.js**, que es un programa intermedio (middleware) de autenticación para Node.js que se integra de forma sencilla con Express.js. Su función principal es verificar la identidad de los usuarios en una aplicación web mediante módulos independientes llamados "estrategias".
 
-El proyecto implementa tres estrategias de Passport.js:
+### Estrategias de Passport.js
 
-- **Local (register)**: Valida y registra nuevos usuarios con email y contraseña. Incluye validaciones de email, longitud de contraseña (mín. 8 caracteres) y prevención de duplicados.
-- **Local (login)**: Autentica usuarios verificando email y contraseña contra los datos almacenados.
-- **JWT (current)**: Valida el JWT almacenado en cookies para identificar al usuario actual en las peticiones autenticadas.
+El proyecto implementa tres estrategias de Passport.js, configuradas en [src/config/passport.config.js](src/config/passport.config.js):
+
+#### 1. Estrategia "register" (Local Strategy)
+Valida y registra nuevos usuarios. Realiza las siguientes validaciones:
+- Verifica que se proporcionen todos los campos requeridos: `first_name`, `last_name`, `email` y `password`
+- Normaliza y valida el formato del email mediante funciones de `emailFunctions.js`
+- Valida que la contraseña tenga una longitud mínima de 8 caracteres
+- Previene duplicados: verifica que no exista otro usuario con el mismo email
+- Utiliza la función `registerUser()` del `user.service.js` para crear el registro en la base de datos
+
+Si alguna validación falla, Passport retorna un error con un `statusCode` y `message` específicos que el `error.middleware.js` captura y formatea para la respuesta HTTP.
+
+#### 2. Estrategia "login" (Local Strategy)
+Autentica usuarios verificando sus credenciales:
+- Normaliza el email ingresado usando `emailFunctions.js`
+- Valida que el formato del email sea correcto
+- Busca el usuario en la base de datos mediante `usersRepository.getByEmail()`
+- Compara la contraseña ingresada con la contraseña hasheada en la BD usando `isValidPassword()` de `hash.js`
+- Retorna un mensaje genérico para credenciales inválidas (previene ataques de información sobre existencia de usuarios)
+
+#### 3. Estrategia "current" (JWT Strategy)
+Valida el JWT almacenado en cookies para identificar al usuario en peticiones autenticadas:
+- Extrae el token JWT desde las cookies usando `cookieExtractor`
+- Verifica la validez del token mediante la clave secreta `JWT_SECRET_KEY`
+- Decodifica el payload del token para obtener el ID del usuario
+- Busca el usuario en la base de datos mediante `usersRepository.getById()`
+- Permite identificar al usuario actual en rutas protegidas
+
+### Manejo de errores con `errors.js`
+
+El archivo [src/utils/errors.js](src/utils/errors.js) define la clase `HttpError` que extiende la clase `Error` de JavaScript y añade propiedades específicas para HTTP:
+
+```javascript
+export class HttpError extends Error {
+  constructor(statusCode, message) {
+    super(message);
+    this.name = 'HttpError';
+    this.statusCode = statusCode;
+  }
+}
+```
+
+Esta clase se utiliza en toda la aplicación para lanzar errores con información estructurada:
+- **statusCode**: El código HTTP a retornar (401, 409, 400, 500, etc.)
+- **message**: El mensaje descriptivo del error
+- **name**: Identifica el tipo de error
+
+En el contexto de Passport:
+- Las estrategias retornan objetos con `statusCode` y `message` via el callback `done()`
+- El `error.middleware.js` captura estos errores y extrae el `statusCode` para construir la respuesta HTTP
+- Los errores internos (5xx) ocultan información sensible en producción
+
+### Middlewares de autenticación y error handling
+
+#### `auth.middleware.js` - Protección de rutas
+El middleware [src/middlewares/auth.middleware.js](src/middlewares/auth.middleware.js) se utiliza en las rutas que requieren autenticación:
+- Verifica que exista un token en las cookies (`req.cookies.currentUser`)
+- Valida el token usando `verifyToken()` de `jwt.js`
+- Si el token es válido, extrae el payload y adjunta los datos del usuario a `req.user`
+- Si no hay token o es inválido, retorna un error 401 (Unauthorized)
+- Permite que solo usuarios autenticados accedan a recursos protegidos
+
+#### `error.middleware.js` - Centralización de errores
+El middleware [src/middlewares/error.middleware.js](src/middlewares/error.middleware.js) es el último middleware en la cadena y captura todos los errores:
+- Verifica si ya se envió una respuesta (si es así, delega al siguiente middleware)
+- Extrae el `statusCode` del error (usa 500 como default)
+- En producción, oculta los mensajes de errores 500 por seguridad
+- Registra los errores 500 en la consola para debugging
+- Retorna una respuesta JSON estructurada con el status y mensaje del error
+
+**Flujo de integración:**
+1. Passport intenta autenticar al usuario usando la estrategia correspondiente
+2. Si hay error, Passport retorna un objeto con `statusCode` y `message`
+3. El controlador lanza un `HttpError` con esa información
+4. El `error.middleware.js` captura el error y lo formatea
+5. La respuesta HTTP se envía con el código y mensaje apropiado
 
 ## Como registrar un usuario nuevo en el sistema
 
