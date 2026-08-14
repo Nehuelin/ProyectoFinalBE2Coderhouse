@@ -1,89 +1,70 @@
-import usersRepository from "../repositories/users.repository.js";
-import { createHash, isValidPassword } from "../utils/hash.js";
-import { generateToken } from "../utils/jwt.js";
+// deprecated due to passport.js impl
 
-class SessionsService {
-  async register(data) {
-    const { first_name, last_name, email, password } = data;
+// import usersRepository from "../repositories/users.repository.js";
+// import { createHash, isValidPassword } from "../utils/hash.js";
+// import { generateToken } from "../utils/jwt.js";
 
-    if (!first_name || !last_name || !email || !password) {
-      throw new Error("Faltan campos obligatorios");
-    }
+// class SessionsService {
+//   async register(data) {
+//     const { first_name, last_name, email, password } = data;
 
-    const normalizedEmail = normalizeEmail(email);
+//     if (!first_name || !last_name || !email || !password) {
+//       throw new Error("Faltan campos obligatorios");
+//     }
 
-    if (!isValidEmail(normalizedEmail)) {
-      throw new Error("El formato del email no es válido");
-    }
+//     const normalizedEmail = normalizeEmail(email);
 
-    if (password.length < 8) {
-      throw new Error("La contraseña debe tener al menos 8 caracteres");
-    }
+//     if (!isValidEmail(normalizedEmail)) {
+//       throw new Error("El formato del email no es válido");
+//     }
 
-    const userExists = await usersRepository.getByEmail(normalizedEmail);
+//     if (password.length < 8) {
+//       throw new Error("La contraseña debe tener al menos 8 caracteres");
+//     }
 
-    if (userExists) {
-      throw new Error("EMAIL_EXISTS");
-    }
+//     const userExists = await usersRepository.getByEmail(normalizedEmail);
 
-    const hashedPassword = await createHash(password);
+//     if (userExists) {
+//       throw new Error("EMAIL_EXISTS");
+//     }
 
-    const newUser = await usersRepository.create({
-      ...data,
-      email: normalizedEmail,
-      password: hashedPassword,
-    });
+//     const hashedPassword = await createHash(password);
 
-    return {
-      id: newUser._id,
-      first_name: newUser.first_name,
-      last_name: newUser.last_name,
-      email: newUser.email,
-      role: newUser.role,
-    };
-  }
+//     const newUser = await usersRepository.create({
+//       ...data,
+//       email: normalizedEmail,
+//       password: hashedPassword,
+//     });
 
-  async login(data) {
-    const { email, password } = data;
+//     return {
+//       id: newUser._id,
+//       first_name: newUser.first_name,
+//       last_name: newUser.last_name,
+//       email: newUser.email,
+//       role: newUser.role,
+//     };
+//   }
 
-    const normalizedEmail = normalizeEmail(email);
-
-    if (!isValidEmail(normalizedEmail)) {
-      throw new Error("El formato del email no es válido");
-    }
-
-    const user = await usersRepository.getByEmail(normalizedEmail);
-
-    if (!user){
-      throw new Error("INVALID_CREDENTIALS");
-    }
-
-    const validPassword = await isValidPassword(password, user.password);
-
-    if (!validPassword){
-      throw new Error("INVALID_CREDENTIALS");
-    }
-
-    // vvvvv user credentials are ok past this point vvvv
-    const tokenUser = {
-      id: user._id,
-      email: user.email,
-      role: user.role,
-    }
-
-    const token = generateToken(tokenUser); 
+//   async login(data) {
     
-    return {
-      token: token
-    };
-  }
-}
+//     const tokenUser = {
+//       id: user._id,
+//       email: user.email,
+//       role: user.role,
+//     }
 
-const normalizeEmail = (email) => email.toLowerCase().trim();
+//     const token = generateToken(tokenUser); 
+    
+//     return {
+//       token: token
+//     };
+//   }
+// }
 
-const isValidEmail = (email) => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-};
+// const normalizeEmail = (email) => email.toLowerCase().trim();
 
-export default new SessionsService();
+// const isValidEmail = (email) => {
+//   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+//   return emailRegex.test(email);
+// };
+

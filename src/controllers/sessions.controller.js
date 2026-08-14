@@ -1,66 +1,59 @@
-import sessionsService from "../services/sessions.service.js";
+import { generateToken } from "../utils/jwt.js";
+import { UserDTO } from "../dto/user.dto.js";
 
 export const register = async (req, res) => {
-  try {
-    const result = await sessionsService.register(req.body);
-    
-    res.status(201).json({
-      status: 'success',
-      message: 'Usuario registrado correctamente',
-      payload: result
-    });
-
-  } catch (error) {
-    if (error.message === "EMAIL_EXISTS") {
-
-      return res.status(409).json({
-        status: 'error',
-        message: 'Ya existe un usuario registrado con ese email'
-      });
-
-    } else {
-
-      return res.status(400).json({
-        status: 'error',
-        message: error.message
-      })
-    }
-  };
+  res.status(201).json({
+    status: 'success',
+    message: 'Usuario registrado correctamente',
+  });
 };
 
 export const login = async (req, res) => {
   try {
-    const result = await sessionsService.login(req.body);
 
-    res.cookie("currentUser", result.token, {httpOnly: true, sameSite: 'lax', maxAge: 60*60*1000, secure: process.env.NODE_ENV === 'production'}); 
+    const user = req.user;
+
+    const token = generateToken(user); 
+
+    res.cookie("currentUser", token, {httpOnly: true, sameSite: 'lax', maxAge: 60*60*1000, secure: process.env.NODE_ENV === 'production'}); 
     
     res.status(200).json({
       status: 'success',
       message: 'Usuario logueado correctamente',
-      token: result.token
+      token: token
     });
 
   } catch (error) {
-    if (error.message === "INVALID_CREDENTIALS") {
+    
+    console.error(error);
 
-      return res.status(401).json({
-        status: 'error',
-        message: 'Credenciales inválidas'
-      });
-
-    } else {
-
-      return res.status(400).json({
-        status: 'error',
-        message: error.message
-      })
-
-    }
+    return res.status(500).json({
+      status: "error",
+      message: "Error interno del servidor"
+    })
   }
 };
 
 export const getCurrentUser = (req, res) => {
-  return res.status(200).json(req.user);
+  try {
+
+    const user = req.user;
+
+    const userDTO = new UserDTO(user);
+    
+    return res.status(200).json({
+      status: "success",
+      payload: userDTO
+    });
+
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      status: "error",
+      message: "Error interno del servidor"
+    });
+  }
 }
 
 export const logout = (req, res) => {

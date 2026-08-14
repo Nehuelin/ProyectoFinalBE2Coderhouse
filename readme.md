@@ -14,6 +14,7 @@ Se eligió la gestión de eventos dentro de parques tematicos. Esto incluye show
 - **Express 5** para el servidor HTTP y las rutas de la API.
 - **MongoDB** como base de datos.
 - **Mongoose** para definir modelos y conectarse a MongoDB.
+- **Passport.js** para autenticación y autorización.
 - **dotenv** para cargar la configuración desde variables de entorno.
 - **express-handlebars**, instalado para una futura capa de vistas (aún no configurado).
 - **nodemon**, disponible como dependencia de desarrollo (el script actual de desarrollo utiliza el modo `--watch` nativo de Node.js).
@@ -144,6 +145,16 @@ Probar el endpoint preliminar de creación:
 
 ![alt text](/docs/images/create-event.png)
 
+## Uso de Passport.js para sesiones
+
+Para los procesos de registro, login, sesión y logout se utiliza **passport.js**, que es un programa intermedio (middleware) de autenticación para Node.js que se integra de forma sencilla con Express.js. Su función principal es verificar la identidad de los usuarios en una aplicación web mediante módulos independientes llamados "estrategias".
+
+El proyecto implementa tres estrategias de Passport.js:
+
+- **Local (register)**: Valida y registra nuevos usuarios con email y contraseña. Incluye validaciones de email, longitud de contraseña (mín. 8 caracteres) y prevención de duplicados.
+- **Local (login)**: Autentica usuarios verificando email y contraseña contra los datos almacenados.
+- **JWT (current)**: Valida el JWT almacenado en cookies para identificar al usuario actual en las peticiones autenticadas.
+
 ## Como registrar un usuario nuevo en el sistema
 
 Para registrar un nuevo usuario en el sistema se debe utilizar el siguiente endpoint:
@@ -205,3 +216,6 @@ Para hacer logout se utiliza el endpoint POST sessions/logout. Este endpoint bor
 Como se puede ver, la cookie ya no posee un valor, por lo que el token fue eliminado exitosamente.
 
 ![alt text](/docs/images/session-cookie-deletion.png)
+
+
+

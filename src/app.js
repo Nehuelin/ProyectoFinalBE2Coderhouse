@@ -1,7 +1,9 @@
 import express from 'express'
-import cookieParser from 'cookie-parser'
-import { connectDB } from './config/database.js'
 import 'dotenv/config'
+import passport from 'passport'
+import cookieParser from 'cookie-parser'
+import './config/passport.config.js'
+import { connectDB } from './config/database.js'
 // import usersRouter from './routes/users.routes.js'
 import sessionsRouter from './routes/sessions.routes.js'
 // import ticketsRouter from './routes/tickets.routes.js'
@@ -14,6 +16,7 @@ app.use(express.json())
 connectDB()
 
 app.use(cookieParser());
+app.use(passport.initialize());
 
 // app.use('/api/users', usersRouter)
 app.use('/api/sessions', sessionsRouter)
