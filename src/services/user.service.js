@@ -1,11 +1,11 @@
-import usersRepository from "../repositories/users.repository.js";
+import userRepository from "../repositories/user.repository.js";
 import { createHash, isValidPassword } from "../utils/hash.js";
-import { generateToken } from "../utils/jwt.js";
+import { normalizeEmail } from "../utils/emailFunctions.js";
 
 class UserService {
   async registerUser({ first_name, last_name, email, password }) {
     
-    const userExists = await usersRepository.getByEmail(email);
+    const userExists = await userRepository.getByEmail(email);
 
     if (userExists) {
       throw new Error("EMAIL_EXISTS");
@@ -13,7 +13,7 @@ class UserService {
 
     const hashedPassword = await createHash(password);
 
-    const newUser = await usersRepository.create({
+    const newUser = await userRepository.createUser({
       first_name: first_name,
       last_name: last_name,
       email: email,
@@ -28,6 +28,28 @@ class UserService {
       email: newUser.email,
       role: newUser.role,
     };
+  }
+
+  async registerGithubUser({ first_name, last_name, email, providerId }){
+    const normalizedEmail = normalizeEmail(email);
+
+    let user = await userRepository.getByEmail(normalizedEmail);
+
+    if (user){
+      return user;
+    }
+
+    user = await userRepository.createUser({
+      first_name, 
+      last_name, 
+      email: normalizedEmail, 
+      password: null, 
+      role: "user", 
+      provider: "github", 
+      providerId
+    });
+
+    return user;
   }
 }
 

@@ -16,3 +16,11 @@ export const createEvent = async (req, res) => {
     res.status(500).json({ error: 'Error al crear evento' })
   }
 }
+
+export const modifyEvent = async(req, res) => {
+  try {
+    res.json({ message: 'Modificar evento' })
+  } catch (error) {
+    res.status(500).json({ error: 'Error al crear evento' })
+  }
+}

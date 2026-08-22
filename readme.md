@@ -57,6 +57,9 @@ Se eligió la gestión de eventos dentro de parques tematicos. Esto incluye show
 | `NODE_ENV` | Sí | `development` | Identifica el entorno. Se utiliza para aumentar la seguridad de los tokens JWT cuando su valor es `production`. |
 | `JWT_SECRET_KEY` | Sí | `una-clave-segura` | Se utilizará para firmar tokens JWT. |
 | `JWT_EXPIRES_IN` | Sí | `1h` | Se utilizará para establecer el tiempo de vigencia de los tokens JWT. |
+| `GITHUB_CLIENT_ID` | Solo para login con GitHub | `tu-client-id` | Identificador de la OAuth App de GitHub. |
+| `GITHUB_CLIENT_SECRET` | Solo para login con GitHub | `tu-client-secret` | Secreto de la OAuth App de GitHub. |
+| `GITHUB_CALLBACK_URL` | Solo para login con GitHub | `http://localhost:8080/api/sessions/github/callback` | URL de callback registrada en la OAuth App de GitHub. |
 
 Ejemplo de `.env` para desarrollo local:
 
@@ -66,6 +69,9 @@ NODE_ENV=development
 MONGO_URL=mongodb://127.0.0.1:27017/eventos
 JWT_SECRET_KEY=reemplazar-por-un-secreto-seguro
 JWT_EXPIRES_IN=1h
+GITHUB_CLIENT_ID=reemplazar-por-client-id
+GITHUB_CLIENT_SECRET=reemplazar-por-client-secret
+GITHUB_CALLBACK_URL=http://localhost:8080/api/sessions/github/callback
 ```
 
 > La aplicación intenta conectarse a MongoDB al iniciarse. Si la conexión falla, registra el error en la consola.
@@ -122,18 +128,22 @@ Tambien se puede probar en apps dedicadas a endpoints como Insomnia o Postman. P
 
 URL base local de ejemplo: `http://localhost:8080`.
 
-Las rutas disponibles al momento de escribir este readme son las siguientes:
+Las rutas actualmente montadas en la aplicación son las siguientes:
 
-| Método | Ruta | Estado HTTP | Descripción |
-| --- | --- | :---: | --- |
-| `GET` | `/api/health` | `200` | Comprueba que el servidor esté activo. |
-| `GET` | `/api/events` | `200` | Devuelve la colección inicial de eventos; actualmente es un arreglo vacío. |
-| `POST` | `/api/events` | `200` | Endpoint preliminar para crear un evento; aún no valida ni persiste el cuerpo enviado. |
-| `GET` | `/api/sessions` | `200` | Devuelve un token de sesión de ejemplo. No autentica usuarios todavía. |
-| `POST` | `/api/sessions/register` | `201` | Registra un usuario nuevo en el sistema. El mail provisto NO debe existir en la base de datos, y la contraseña debe tener al menos 8 caracteres. |
-| `POST` | `/api/sessions/login` | `200` | Verifica las credenciales dadas y si son correctas devuelve el token de sesión para el usuario mediante cookies. |
-| `GET` | `/api/sessions/current` | `200` | Verifica las cookies de sesion para mostrar datos del usuario que tiene la sesión actual  |
-| `POST` | `/api/sessions/logout` | `200` | Elimina las cookies de sesión actual, sacando al usuario de la sesión |
+| Método | Ruta | Estado HTTP | Protección | Descripción |
+| --- | --- | :---: | --- | --- |
+| `GET` | `/api/health` | `200` | Pública | Comprueba que el servidor esté activo. |
+| `GET` | `/api/events` | `200` | Pública | Devuelve la colección inicial de eventos; actualmente es un arreglo vacío. |
+| `POST` | `/api/events` | `200` | Rol requerido | Endpoint preliminar para crear un evento; aún no valida ni persiste el cuerpo enviado. |
+| `POST` | `/api/sessions/register` | `201` | Pública | Registra un usuario nuevo. El email no debe existir y la contraseña debe tener al menos 8 caracteres. |
+| `POST` | `/api/sessions/login` | `200` | Pública | Verifica las credenciales, crea la cookie JWT `currentUser` y devuelve el token. |
+| `GET` | `/api/sessions/github` | Redirección | Pública | Inicia la autenticación con GitHub. |
+| `GET` | `/api/sessions/github/callback` | `200` | Pública | Recibe la respuesta de GitHub, registra o recupera al usuario y crea la cookie JWT. |
+| `GET` | `/api/sessions/current` | `200` | `admin` u `organizer` | Devuelve los datos del usuario de la sesión actual. |
+| `POST` | `/api/sessions/logout` | `200` | Pública | Elimina la cookie de sesión actual. |
+| `GET` | `/api/users` | `200` | `admin` | Devuelve todos los usuarios. |
+
+La ruta `/api/tickets` todavía no está disponible: su router y controlador están vacíos y el router no está montado en `src/app.js`.
 
 ### Ejemplos
 
@@ -167,7 +177,7 @@ Si alguna validación falla, Passport retorna un error con un `statusCode` y `me
 Autentica usuarios verificando sus credenciales:
 - Normaliza el email ingresado usando `emailFunctions.js`
 - Valida que el formato del email sea correcto
-- Busca el usuario en la base de datos mediante `usersRepository.getByEmail()`
+- Busca el usuario en la base de datos mediante `userRepository.getByEmail()`
 - Compara la contraseña ingresada con la contraseña hasheada en la BD usando `isValidPassword()` de `hash.js`
 - Retorna un mensaje genérico para credenciales inválidas (previene ataques de información sobre existencia de usuarios)
 
@@ -176,7 +186,7 @@ Valida el JWT almacenado en cookies para identificar al usuario en peticiones au
 - Extrae el token JWT desde las cookies usando `cookieExtractor`
 - Verifica la validez del token mediante la clave secreta `JWT_SECRET_KEY`
 - Decodifica el payload del token para obtener el ID del usuario
-- Busca el usuario en la base de datos mediante `usersRepository.getById()`
+- Busca el usuario en la base de datos mediante `userRepository.getById()`
 - Permite identificar al usuario actual en rutas protegidas
 
 ### Manejo de errores con `errors.js`
@@ -291,4 +301,61 @@ Como se puede ver, la cookie ya no posee un valor, por lo que el token fue elimi
 ![alt text](/docs/images/session-cookie-deletion.png)
 
 
+## Login con GitHub
 
+Además del login local mediante email y contraseña, es posible iniciar sesión con una cuenta de GitHub. El flujo es el siguiente:
+
+1. Abrir `GET /api/sessions/github`.
+2. La aplicación redirige a GitHub para solicitar autorización y acceso al email de la cuenta.
+3. GitHub redirige a `GET /api/sessions/github/callback`.
+4. El servidor registra al usuario si es la primera vez que ingresa, genera un JWT y lo guarda en la cookie `currentUser`.
+
+Para habilitar este flujo se deben configurar las credenciales de una OAuth App de GitHub mediante `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` y `GITHUB_CALLBACK_URL`. El callback debe apuntar a `/api/sessions/github/callback` en la URL base del servidor.
+
+![Login exitoso con GitHub](/docs/images/github-login-success.png)
+
+## Roles y RBAC
+
+El sistema utiliza control de acceso basado en roles (RBAC, por sus siglas en inglés). Cada usuario tiene uno de estos roles, almacenado en el campo `role`:
+
+- **`user`**: usuario general. Puede consultar los eventos públicos y es el rol asignado por defecto a los registros nuevos.
+- **`organizer`**: responsable de organizar eventos. Puede consultar eventos y acceder a las operaciones destinadas a organizadores.
+- **`admin`**: administrador del sistema. Puede consultar todos los usuarios y acceder a las operaciones administrativas.
+
+La tabla siguiente resume los permisos funcionales definidos para el proyecto:
+
+| Acción | `user` | `organizer` | `admin` |
+| --- | :---: | :---: | :---: |
+| Ver eventos | Sí | Sí | Sí |
+| Inscribirse a eventos | Sí | Opcional | Opcional |
+| Crear eventos | No | Sí | Sí |
+| Editar eventos propios | No | Sí | Sí |
+| Editar cualquier evento | No | No | Sí |
+| Administrar categorías | No | No | Sí |
+| Ver todos los usuarios | No | No | Sí |
+| Cambiar roles | No | No | Sí |
+
+### RBAC de los endpoints implementados
+
+| Endpoint | Acceso |
+| --- | --- |
+| `GET /api/health` | Público |
+| `GET /api/events` | Público |
+| `POST /api/events` | Organizador según la intención de la ruta |
+| `GET /api/sessions/current` | `admin` u `organizer` |
+| `GET /api/users` | `admin` |
+
+Las operaciones de inscripción, edición de eventos, administración de categorías y cambio de roles todavía no tienen endpoints implementados.
+
+## Rutas protegidas
+
+Las rutas protegidas requieren que el cliente envíe la cookie `currentUser`, creada después de un login local o de GitHub. La cookie contiene un JWT firmado con `JWT_SECRET_KEY`; el servidor lo valida y obtiene el `id`, email y rol del usuario antes de autorizar la operación.
+
+Actualmente están protegidas `/api/sessions/current` y `/api/users`. Ambas validan el JWT mediante la estrategia `current` de Passport y luego verifican el rol permitido. El endpoint `POST /api/events` también intenta aplicar autorización por rol, aunque todavía no ejecuta el middleware de autenticación y su lista de roles contiene `email` en lugar de `admin`; por eso debe considerarse una implementación pendiente antes de usarlo como endpoint protegido en producción.
+
+## Diferencia entre errores 401 y 403
+
+- **401 Unauthorized**: la solicitud no tiene una autenticación válida. Ocurre cuando falta la cookie `currentUser`, el JWT es inválido o expiró, o las credenciales de login no son correctas. La solución es autenticarse nuevamente o enviar credenciales válidas.
+- **403 Forbidden**: el usuario sí está autenticado, pero su rol no tiene permisos para el recurso. Por ejemplo, un usuario con rol `user` que intenta consultar `GET /api/users` recibe este error; debe solicitar un rol autorizado.
+
+En resumen, `401` significa “no se pudo identificar al usuario” y `403` significa “se identificó al usuario, pero no tiene autorización suficiente”.

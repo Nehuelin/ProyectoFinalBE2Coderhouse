@@ -1,9 +1,10 @@
 import passport from 'passport'
 import { Strategy as LocalStrategy } from 'passport-local'
 import { Strategy as JwTStrategy, ExtractJwt } from 'passport-jwt'
+import { Strategy as GitHubStrategy } from 'passport-github2'
 import { isValidPassword } from '../utils/hash.js'
 import userService from '../services/user.service.js'
-import usersRepository from '../repositories/users.repository.js'
+import userRepository from '../repositories/user.repository.js'
 import { isValidEmail, normalizeEmail } from '../utils/emailFunctions.js'
 
 
@@ -63,7 +64,7 @@ passport.use("login", new LocalStrategy({
         return done(null, false, {statusCode: 400, message: "El formato del email no es válido"})
       }
   
-      const user = await usersRepository.getByEmail(normalizedEmail);
+      const user = await userRepository.getByEmail(normalizedEmail);
   
       if (!user){
         return done(null, false, {statusCode: 401, message: "Credenciales invalidas"});
@@ -78,6 +79,37 @@ passport.use("login", new LocalStrategy({
       return done(null, user);
 
     } catch (error) {
+      return done(error);
+    }
+  }
+));
+
+passport.use("github", new GitHubStrategy({
+    clientID: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    callbackURL: process.env.GITHUB_CALLBACK_URL
+  },
+
+  async (accessToken, refreshToken, profile, done) => {
+    try {
+      console.log("Github profile: ", profile);
+
+      const email = profile.emails?.[0]?.value;
+
+      if (!email){
+        return done(null, false, {statusCode: 401, message: "Github no proporcionó un email"});
+      }
+
+      const first_name = profile.name?.givenName || profile.displayName || "Usuario";
+
+      const last_name = profile.name?.familyName || "";
+
+      const user = await userService.registerGithubUser({first_name, last_name, email, providerId: profile.id});
+
+      return done(null, user);
+    } catch (error) {
+      console.log("Error GitHub: ", error)
+
       return done(error);
     }
   }
@@ -98,7 +130,7 @@ passport.use("current", new JwTStrategy({
 
   async (payload, done) => {
     try {
-      const user = await usersRepository.getById(payload.id);
+      const user = await userRepository.getById(payload.id);
 
       if (!user){
         return done(null, false);
@@ -111,6 +143,7 @@ passport.use("current", new JwTStrategy({
     }
   }
 ));
+
 
 export default passport;
 

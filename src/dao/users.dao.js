@@ -1,6 +1,10 @@
 import User from "../models/user.model.js"
 
 class UsersDAO {
+    async findAll(){
+        return await User.find();
+    }
+
     async findByEmail(email) {
         return await User.findOne({email});
     }
