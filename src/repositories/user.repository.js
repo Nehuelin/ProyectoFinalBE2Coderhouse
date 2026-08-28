@@ -1,21 +1,25 @@
-import usersDAO from "../dao/users.dao.js";
+import { UserDAO } from "../dao/user.dao.js";
 
 class UserRepository {
-    async getAll(){
-        return await usersDAO.findAll();
-    }
+  constructor() {
+    this.dao = new UserDAO();
+  }
 
-    async getByEmail(email) {
-        return await usersDAO.findByEmail(email);
-    }
+  async getAll(){
+    return await this.dao.findAll();
+  }
 
-    async getById(id){
-        return await usersDAO.findById(id);
-    }
+  async getByEmail(email) {
+    return await this.dao.findByEmail(email);
+  }
 
-    async createUser(userData){
-        return await usersDAO.create(userData);
-    }
+  async getById(id){
+    return await this.dao.findById(id);
+  }
+
+  async createUser(userData){
+    return await this.dao.create(userData);
+  }
 }
 
 export default new UserRepository();

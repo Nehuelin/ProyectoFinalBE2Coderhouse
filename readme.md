@@ -1,4 +1,4 @@
-# Proyecto Final Coderhouse - Backend II (Pre-Entrega 5)
+# Proyecto Final Coderhouse - Backend II (Pre-Entrega 6)
 
 ## Nombre del Proyecto
 ParkEvent Solutions
@@ -133,8 +133,17 @@ Las rutas actualmente montadas en la aplicación son las siguientes:
 | Método | Ruta | Estado HTTP | Protección | Descripción |
 | --- | --- | :---: | --- | --- |
 | `GET` | `/api/health` | `200` | Pública | Comprueba que el servidor esté activo. |
-| `GET` | `/api/events` | `200` | Pública | Devuelve la colección inicial de eventos; actualmente es un arreglo vacío. |
-| `POST` | `/api/events` | `200` | Rol requerido | Endpoint preliminar para crear un evento; aún no valida ni persiste el cuerpo enviado. |
+| `GET` | `/api/events` | `200` | Pública | Lista eventos con paginación, filtros por estado, categoría, ubicación y fecha, y ordenamiento. |
+| `GET` | `/api/events/:id` | `200` | Pública | Devuelve un evento por ID, incluyendo su categoría y organizador. |
+| `POST` | `/api/events` | `201` | `organizer` o `admin` | Crea un evento validando su categoría y sus datos del parque temático. |
+| `PUT` | `/api/events/:id` | `200` | `organizer` o `admin` | Actualiza un evento; el organizador solo puede modificar eventos propios. |
+| `PATCH` | `/api/events/:id/status` | `200` | `organizer` o `admin` | Cambia el estado de un evento respetando sus transiciones permitidas. |
+| `GET` | `/api/categories` | `200` | Pública | Devuelve las categorías activas ordenadas por nombre. |
+| `GET` | `/api/categories/:id` | `200` | Pública | Devuelve una categoría activa por su ID. |
+| `POST` | `/api/categories` | `201` | `admin` | Crea una categoría; el slug se genera si no se envía. |
+| `PUT` | `/api/categories/:id` | `200` | `admin` | Actualiza el nombre, slug o descripción de una categoría. |
+| `PATCH` | `/api/categories/:id/status` | `200` | `admin` | Activa o desactiva una categoría mediante `isActive`. |
+| `DELETE` | `/api/categories/:id` | `200` | `admin` | Desactiva una categoría sin romper eventos existentes. |
 | `POST` | `/api/sessions/register` | `201` | Pública | Registra un usuario nuevo. El email no debe existir y la contraseña debe tener al menos 8 caracteres. |
 | `POST` | `/api/sessions/login` | `200` | Pública | Verifica las credenciales, crea la cookie JWT `currentUser` y devuelve el token. |
 | `GET` | `/api/sessions/github` | Redirección | Pública | Inicia la autenticación con GitHub. |
@@ -145,15 +154,15 @@ Las rutas actualmente montadas en la aplicación son las siguientes:
 
 La ruta `/api/tickets` todavía no está disponible: su router y controlador están vacíos y el router no está montado en `src/app.js`.
 
-### Ejemplos
+### Eventos
 
-Listar eventos:
+Los endpoints de eventos permiten consultar la agenda públicamente y administrarla con autenticación. `GET /api/events` acepta los filtros `status`, `category`, `location`, `dateFrom` y `dateTo`; también admite `page`, `limit` (entre 1 y 100) y `sort`. Los campos ordenables son `date`, `price`, `title`, `category`, `location`, `eventType`, `durationMinutes` y `parkArea`; anteponer `-` invierte el orden. `GET /api/events/:id` devuelve el evento con la categoría y el organizador completos.
 
-![alt text](/docs/images/get-all-events.png)
+Para crear o editar se requiere el rol `organizer` o `admin` y una categoría activa. Un organizador solo puede modificar sus propios eventos, mientras que un administrador puede modificar cualquiera. Se validan los tipos de evento (`show`, `parade`, `celebration`, `meet-and-greet`, `workshop`), las edades recomendadas (`all-ages`, `children`, `teens`, `adults`), la fecha futura, la duración y capacidad mayores que cero, el precio no negativo y los estados `draft`, `published`, `cancelled` o `finished`. La fecha y los datos principales no pueden dejarse inválidos; los eventos cancelados no se pueden modificar ni cambiar de estado, y un evento finalizado no puede volver a publicarse.
 
-Probar el endpoint preliminar de creación:
+### Categorías
 
-![alt text](/docs/images/create-event.png)
+`GET /api/categories` y `GET /api/categories/:id` son públicos y no tienen filtros: solo muestran categorías activas. La creación, actualización, cambio de estado y eliminación requieren el rol `admin`. El nombre es obligatorio, el slug se normaliza en formato URL y se genera a partir del nombre si no se envía; las actualizaciones deben incluir al menos un campo válido. `PATCH /api/categories/:id/status` controla `isActive` con un booleano y `DELETE` realiza una desactivación lógica para conservar las referencias de eventos existentes. Las categorías inactivas no pueden asignarse a eventos nuevos o modificados.
 
 ## Uso de Passport.js para sesiones
 
@@ -341,17 +350,26 @@ La tabla siguiente resume los permisos funcionales definidos para el proyecto:
 | --- | --- |
 | `GET /api/health` | Público |
 | `GET /api/events` | Público |
-| `POST /api/events` | Organizador según la intención de la ruta |
+| `GET /api/events/:id` | Público |
+| `POST /api/events` | `organizer` o `admin` |
+| `PUT /api/events/:id` | `organizer` o `admin`; organizadores solo sobre eventos propios |
+| `PATCH /api/events/:id/status` | `organizer` o `admin`; organizadores solo sobre eventos propios |
+| `GET /api/categories` | Público; solo categorías activas |
+| `GET /api/categories/:id` | Público; solo categorías activas |
+| `POST /api/categories` | `admin` |
+| `PUT /api/categories/:id` | `admin` |
+| `PATCH /api/categories/:id/status` | `admin` |
+| `DELETE /api/categories/:id` | `admin` |
 | `GET /api/sessions/current` | `admin` u `organizer` |
 | `GET /api/users` | `admin` |
 
-Las operaciones de inscripción, edición de eventos, administración de categorías y cambio de roles todavía no tienen endpoints implementados.
+Las operaciones de inscripción y cambio de roles todavía no tienen endpoints implementados. La administración de categorías está disponible para administradores mediante las rutas documentadas arriba; `DELETE` realiza una desactivación lógica.
 
 ## Rutas protegidas
 
 Las rutas protegidas requieren que el cliente envíe la cookie `currentUser`, creada después de un login local o de GitHub. La cookie contiene un JWT firmado con `JWT_SECRET_KEY`; el servidor lo valida y obtiene el `id`, email y rol del usuario antes de autorizar la operación.
 
-Actualmente están protegidas `/api/sessions/current` y `/api/users`. Ambas validan el JWT mediante la estrategia `current` de Passport y luego verifican el rol permitido. El endpoint `POST /api/events` también intenta aplicar autorización por rol, aunque todavía no ejecuta el middleware de autenticación y su lista de roles contiene `email` en lugar de `admin`; por eso debe considerarse una implementación pendiente antes de usarlo como endpoint protegido en producción.
+Actualmente están protegidas las operaciones de administración de eventos y categorías, además de `/api/sessions/current` y `/api/users`. Estas rutas validan el JWT mediante la estrategia `current` de Passport y luego verifican el rol permitido. Las operaciones de eventos también aplican la regla de propiedad: un `organizer` solo puede administrar sus propios eventos.
 
 ## Diferencia entre errores 401 y 403
 
