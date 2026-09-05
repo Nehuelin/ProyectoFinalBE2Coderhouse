@@ -1,7 +1,34 @@
-# Proyecto Final Coderhouse - Backend II (Pre-Entrega 6)
+# Proyecto Final Coderhouse - Backend II (Pre-Entrega 7)
 
 ## Nombre del Proyecto
 ParkEvent Solutions
+
+## Tabla de contenido
+
+- [Descripción](#descripción)
+- [Tecnologías](#tecnologías)
+- [Requisitos previos](#requisitos-previos)
+- [Instalación](#instalación)
+- [Configuración](#configuración)
+  - [Variables de entorno](#variables-de-entorno)
+- [Ejecución](#ejecución)
+  - [Desarrollo](#desarrollo)
+- [Estructura de carpetas](#estructura-de-carpetas)
+- [Rutas disponibles](#rutas-disponibles)
+  - [Estados posibles de un ticket](#estados-posibles-de-un-ticket)
+  - [Flujo de inscripción / compra de ticket](#flujo-de-inscripción--compra-de-ticket)
+  - [Reglas de cupos](#reglas-de-cupos)
+  - [Eventos](#eventos)
+  - [Categorías](#categorías)
+- [Uso de Passport.js para sesiones](#uso-de-passportjs-para-sesiones)
+  - [Estrategias de Passport.js](#estrategias-de-passportjs)
+- [Cómo registrar un usuario nuevo en el sistema](#como-registrar-un-usuario-nuevo-en-el-sistema)
+- [Proceso de login / logout](#proceso-de-login--logout)
+- [Login con GitHub](#login-con-github)
+- [Roles y RBAC](#roles-y-rbac)
+  - [RBAC de los endpoints implementados](#rbac-de-los-endpoints-implementados)
+- [Rutas protegidas](#rutas-protegidas)
+- [Diferencia entre errores 401 y 403](#diferencia-entre-errores-401-y-403)
 
 ## Descripción
 ParkEvent Solutions es un software que se dedica a gestionar distintos tipos de eventos dentro de un parque tematico. 
@@ -60,6 +87,11 @@ Se eligió la gestión de eventos dentro de parques tematicos. Esto incluye show
 | `GITHUB_CLIENT_ID` | Solo para login con GitHub | `tu-client-id` | Identificador de la OAuth App de GitHub. |
 | `GITHUB_CLIENT_SECRET` | Solo para login con GitHub | `tu-client-secret` | Secreto de la OAuth App de GitHub. |
 | `GITHUB_CALLBACK_URL` | Solo para login con GitHub | `http://localhost:8080/api/sessions/github/callback` | URL de callback registrada en la OAuth App de GitHub. |
+| `MAIL_HOST` | Sí para emails de confirmación | `smtp.gmail.com` | Host del servidor SMTP para enviar emails. |
+| `MAIL_PORT` | Sí para emails de confirmación | `465` | Puerto SMTP del proveedor de correo. |
+| `MAIL_USER` | Sí para emails de confirmación | `tu-mail@ejemplo.com` | Usuario autenticado para el servidor SMTP. |
+| `MAIL_PASS` | Sí para emails de confirmación | `app-password` | app password del SMTP. |
+| `MAIL_FROM` | Sí para emails de confirmación | `ParkEvent Solutions <noreply@ejemplo.com>` | Dirección utilizada como remitente en el email. |
 
 Ejemplo de `.env` para desarrollo local:
 
@@ -72,6 +104,11 @@ JWT_EXPIRES_IN=1h
 GITHUB_CLIENT_ID=reemplazar-por-client-id
 GITHUB_CLIENT_SECRET=reemplazar-por-client-secret
 GITHUB_CALLBACK_URL=http://localhost:8080/api/sessions/github/callback
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=465
+MAIL_USER=tu-mail@ejemplo.com
+MAIL_PASS=app-password
+MAIL_FROM=ParkEvent Solutions <noreply@ejemplo.com>
 ```
 
 > La aplicación intenta conectarse a MongoDB al iniciarse. Si la conexión falla, registra el error en la consola.
@@ -144,6 +181,11 @@ Las rutas actualmente montadas en la aplicación son las siguientes:
 | `PUT` | `/api/categories/:id` | `200` | `admin` | Actualiza el nombre, slug o descripción de una categoría. |
 | `PATCH` | `/api/categories/:id/status` | `200` | `admin` | Activa o desactiva una categoría mediante `isActive`. |
 | `DELETE` | `/api/categories/:id` | `200` | `admin` | Desactiva una categoría sin romper eventos existentes. |
+| `GET` | `/api/tickets` | `200` | Pública | Lista tickets con paginación, filtros y ordenamiento. |
+| `GET` | `/api/tickets/:id` | `200` | Pública | Devuelve un ticket por ID. |
+| `GET` | `/api/tickets/my/tickets` | `200` | `user`, `organizer` o `admin` | Devuelve los tickets del usuario autenticado. |
+| `POST` | `/api/tickets` | `201` | `user`, `organizer` o `admin` | Crea una reserva para un evento publicado. |
+| `PATCH` | `/api/tickets/:id/cancel` | `200` | `user`, `organizer` o `admin` | Cancela un ticket propio o uno administrado por un `admin`. |
 | `POST` | `/api/sessions/register` | `201` | Pública | Registra un usuario nuevo. El email no debe existir y la contraseña debe tener al menos 8 caracteres. |
 | `POST` | `/api/sessions/login` | `200` | Pública | Verifica las credenciales, crea la cookie JWT `currentUser` y devuelve el token. |
 | `GET` | `/api/sessions/github` | Redirección | Pública | Inicia la autenticación con GitHub. |
@@ -152,7 +194,39 @@ Las rutas actualmente montadas en la aplicación son las siguientes:
 | `POST` | `/api/sessions/logout` | `200` | Pública | Elimina la cookie de sesión actual. |
 | `GET` | `/api/users` | `200` | `admin` | Devuelve todos los usuarios. |
 
-La ruta `/api/tickets` todavía no está disponible: su router y controlador están vacíos y el router no está montado en `src/app.js`.
+### Estados posibles de un ticket
+
+Los tickets se manejan con los siguientes estados:
+
+- `active`: ticket vigente y válido para el evento.
+- `cancelled`: ticket cancelado, con fecha de cancelación guardada en `cancelledAt`.
+
+La validación del modelo se realiza en `src/models/ticket.model.js` y el servicio controla que `active` y `cancelled` sean los únicos valores permitidos.
+
+### Flujo de inscripción / compra de ticket
+
+El flujo actual de inscripción es:
+
+1. El usuario autenticado envía `POST /api/tickets` con `eventId` y `quantity`.
+2. El backend valida que el evento exista y esté en estado `published`.
+3. Verifica que la fecha del evento aún no haya pasado.
+4. Comprueba que el usuario no tenga ya un ticket activo para ese mismo evento.
+5. Revisa la disponibilidad restante del evento usando la capacidad total y los tickets reservados.
+6. Si todo es válido, genera un código único de ticket y crea el registro.
+7. Envía un email de confirmación al usuario con el código de reserva.
+
+![Email de confirmación de ticket](/docs/images/ticket-email.png)
+
+### Reglas de cupos
+
+La cantidad de tickets a reservar se valida según estas reglas:
+
+- `quantity` es opcional y por defecto vale `1`.
+- Debe ser un número mayor que `0`.
+- No puede reservarse una cantidad que supere la disponibilidad restante del evento.
+- La disponibilidad se calcula como `capacidad del evento - tickets reservados activos`.
+- Si el usuario ya tiene un ticket activo para el evento, el sistema rechaza otra compra del mismo evento.
+- El servicio también evita reservar entradas para eventos ya finalizados o cancelados.
 
 ### Eventos
 

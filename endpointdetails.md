@@ -35,7 +35,13 @@ This file is the secondary README for the ParkEvent Solutions backend. It descri
 	- [`POST /api/events`](#post-apievents)
 	- [`PUT /api/events/:id`](#put-apieventsid)
 	- [`PATCH /api/events/:id/status`](#patch-apieventsidstatus)
-- [7. Tickets and Unmounted Routes](#7-tickets-and-unmounted-routes)
+- [7. Tickets](#7-tickets)
+	- [Ticket data model](#ticket-data-model)
+	- [`GET /api/tickets`](#get-api-tickets)
+	- [`GET /api/tickets/:id`](#get-api-ticketsid)
+	- [`GET /api/tickets/my/tickets`](#get-api-ticketsmy-tickets)
+	- [`POST /api/tickets`](#post-api-tickets)
+	- [`PATCH /api/tickets/:id/cancel`](#patch-api-ticketsidcancel)
 - [8. Authorization Test Matrix](#8-authorization-test-matrix)
 - [9. Useful Negative Tests](#9-useful-negative-tests)
 
@@ -832,22 +838,224 @@ Allowed values are `draft`, `published`, `cancelled`, and `finished`. A cancelle
 }
 ```
 
-## 7. Tickets and Unmounted Routes
+## 7. Tickets
 
-There is currently no usable ticket API. `src/routes/tickets.routes.js` and `src/controllers/tickets.controller.js` are empty, and the tickets router is commented out in `src/app.js`:
+Tickets represent a reservation for an event by a user. The backend stores the buyer, the event, the quantity, a generated code, and a cancellation state.
 
-```javascript
-// app.use('/api/tickets', ticketsRouter)
+### Ticket data model
+
+| Field | Type | Required | Allowed values or behavior |
+| --- | --- | --- | --- |
+| `user` | ObjectId | Yes | Owner of the ticket |
+| `event` | ObjectId | Yes | Event being booked |
+| `status` | string | No | `active` or `cancelled`; defaults to `active` |
+| `quantity` | number | No | Greater than zero; defaults to `1` |
+| `code` | string | Auto-generated | Unique ticket code |
+| `cancelledAt` | Date | No | Set when the ticket is cancelled |
+
+### `GET /api/tickets`
+
+Lists tickets with pagination, filtering, and sorting. This route is public and does not require authentication.
+
+**Request**
+
+```http
+GET http://localhost:8080/api/tickets?status=active&eventId=777f1a2b3c4d5e6f78901234&page=1&limit=10&sort=-createdAt
 ```
 
-Therefore, do not test ticket endpoints yet. A request such as `GET /api/tickets` currently falls through to the global 404 response:
+**Supported query parameters**
+
+| Parameter | Example | Meaning |
+| --- | --- | --- |
+| `status` | `active` | Filters by ticket status |
+| `eventId` | `777f1a2b3c4d5e6f78901234` | Filters by event ID |
+| `page` | `1` | Page number, minimum 1 |
+| `limit` | `10` | Results per page, from 1 to 100 |
+| `sort` | `-createdAt` | Sort field; prefix with `-` for descending |
+
+Allowed sort fields are `createdAt`, `quantity`, `status`, and `code`.
+
+**Response: `200 OK`**
 
 ```json
 {
-	"status": "error",
-	"message": "Ruta no encontrada: GET /api/tickets"
+	"status": "success",
+	"data": [
+		{
+			"_id": "998f1a2b3c4d5e6f78901234",
+			"user": "888f1a2b3c4d5e6f78901234",
+			"event": "777f1a2b3c4d5e6f78901234",
+			"status": "active",
+			"quantity": 2,
+			"code": "PARK-AB12CD",
+			"cancelledAt": null,
+			"createdAt": "2026-09-05T18:00:00.000Z",
+			"updatedAt": "2026-09-05T18:00:00.000Z"
+		}
+	],
+	"page": 1,
+	"limit": 10,
+	"total": 1,
+	"totalPages": 1
 }
 ```
+
+An invalid `status` or `sort` value returns `400`.
+
+### `GET /api/tickets/:id`
+
+Returns one ticket by ID. It is public and does not require authentication.
+
+**Request**
+
+```http
+GET http://localhost:8080/api/tickets/998f1a2b3c4d5e6f78901234
+```
+
+**Response: `200 OK`**
+
+```json
+{
+	"status": "success",
+	"data": {
+		"_id": "998f1a2b3c4d5e6f78901234",
+		"user": "888f1a2b3c4d5e6f78901234",
+		"event": "777f1a2b3c4d5e6f78901234",
+		"status": "active",
+		"quantity": 2,
+		"code": "PARK-AB12CD",
+		"cancelledAt": null,
+		"createdAt": "2026-09-05T18:00:00.000Z",
+		"updatedAt": "2026-09-05T18:00:00.000Z"
+	}
+}
+```
+
+An invalid ID returns `400`; an unknown ticket returns `404`.
+
+### `GET /api/tickets/my/tickets`
+
+Returns the current user's tickets. Requires a valid `currentUser` cookie and any of the roles `user`, `organizer`, or `admin`.
+
+**Request**
+
+```http
+GET http://localhost:8080/api/tickets/my/tickets
+Cookie: currentUser=<jwt>
+```
+
+**Response: `200 OK`**
+
+```json
+{
+	"status": "success",
+	"data": [
+		{
+			"_id": "998f1a2b3c4d5e6f78901234",
+			"user": "888f1a2b3c4d5e6f78901234",
+			"event": "777f1a2b3c4d5e6f78901234",
+			"status": "active",
+			"quantity": 2,
+			"code": "PARK-AB12CD",
+			"cancelledAt": null,
+			"createdAt": "2026-09-05T18:00:00.000Z",
+			"updatedAt": "2026-09-05T18:00:00.000Z"
+		}
+	],
+	"page": 1,
+	"limit": 10,
+	"total": 1,
+	"totalPages": 1
+}
+```
+
+### `POST /api/tickets`
+
+Creates a ticket for an event. Requires a valid session cookie and role `user`, `organizer`, or `admin`.
+
+**Request headers**
+
+```http
+Content-Type: application/json
+Cookie: currentUser=<user-or-organizer-or-admin-jwt>
+```
+
+**Request body**
+
+```json
+{
+	"eventId": "777f1a2b3c4d5e6f78901234",
+	"quantity": 2
+}
+```
+
+The API validates that:
+
+- `eventId` is required and must be a valid MongoDB ObjectId
+- the event exists
+- the event is `published`
+- the event date is still in the future
+- the user does not already have an active ticket for that event
+- enough seats remain for the requested quantity
+
+**Response: `201 Created`**
+
+```json
+{
+	"status": "success",
+	"message": "Ticket creado",
+	"data": {
+		"_id": "998f1a2b3c4d5e6f78901234",
+		"user": "888f1a2b3c4d5e6f78901234",
+		"event": "777f1a2b3c4d5e6f78901234",
+		"status": "active",
+		"quantity": 2,
+		"code": "PARK-AB12CD",
+		"cancelledAt": null,
+		"createdAt": "2026-09-05T18:00:00.000Z",
+		"updatedAt": "2026-09-05T18:00:00.000Z"
+	}
+}
+```
+
+Possible errors include `400` for invalid payloads or dates, `404` when the event is missing, and `409` or `400` for duplicate or capacity-related conditions depending on the exact validation path.
+
+### `PATCH /api/tickets/:id/cancel`
+
+Cancels an existing ticket. Requires a valid session cookie and role `user`, `organizer`, or `admin`.
+
+A user may cancel only their own ticket unless they are an `admin`. An already cancelled ticket cannot be cancelled again.
+
+**Request**
+
+```http
+PATCH http://localhost:8080/api/tickets/998f1a2b3c4d5e6f78901234/cancel
+Cookie: currentUser=<owner-or-admin-jwt>
+```
+
+No body is required.
+
+**Response: `200 OK`**
+
+```json
+{
+	"status": "success",
+	"message": "Ticket cancelado",
+	"data": {
+		"_id": "998f1a2b3c4d5e6f78901234",
+		"user": "888f1a2b3c4d5e6f78901234",
+		"event": "777f1a2b3c4d5e6f78901234",
+		"status": "cancelled",
+		"quantity": 2,
+		"code": "PARK-AB12CD",
+		"cancelledAt": "2026-09-05T18:30:00.000Z",
+		"createdAt": "2026-09-05T18:00:00.000Z",
+		"updatedAt": "2026-09-05T18:30:00.000Z"
+	}
+}
+```
+
+If the event date has already passed, the cancellation is rejected.
 
 ## 8. Authorization Test Matrix
 

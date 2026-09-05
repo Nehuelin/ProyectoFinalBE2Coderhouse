@@ -1,7 +1,7 @@
-import UserRepository from "../repositories/user.repository.js"
+import userService from "../services/user.service.js";
 
 export const getAllUsers = async (req, res) => {
-  const payload = await UserRepository.getAll();
+  const payload = await userService.getAllUsers();
 
   res.status(200).json({
     status: 'success',

@@ -51,6 +51,12 @@ class UserService {
 
     return user;
   }
+
+  async getAllUsers() {
+    users = await userRepository.getAll();
+
+    return users;
+  }
 }
 
 export default new UserService();

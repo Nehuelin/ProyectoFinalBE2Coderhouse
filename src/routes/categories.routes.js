@@ -8,13 +8,16 @@ import {
   getCategories,
   getCategoryById,
   updateCategory
-} from "../controllers/categories.controller.js";
+} from "../controllers/category.controller.js";
 
 const router = Router();
 const adminOnly = [authenticate("current", 401, "Autenticación requerida"), authorizeRole("admin")];
 
+// PUBLIC
 router.get("/", getCategories);
 router.get("/:id", getCategoryById);
+
+// RBAC DEPENDANT
 router.post("/", ...adminOnly, createCategory);
 router.put("/:id", ...adminOnly, updateCategory);
 router.patch("/:id/status", ...adminOnly, changeCategoryStatus);
