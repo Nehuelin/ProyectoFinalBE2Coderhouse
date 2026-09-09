@@ -1,4 +1,5 @@
 import userRepository from "../repositories/user.repository.js";
+import { UserDTO } from "../dto/user.dto.js";
 import { createHash, isValidPassword } from "../utils/hash.js";
 import { normalizeEmail } from "../utils/emailFunctions.js";
 
@@ -52,10 +53,10 @@ class UserService {
     return user;
   }
 
-  async getAllUsers() {
-    users = await userRepository.getAll();
+  async getAllUsers(filter = {}) {
+    const users = await userRepository.getAll(filter);
 
-    return users;
+    return users.map(user => new UserDTO(user));
   }
 }
 

@@ -3,6 +3,7 @@ import { TicketRepository } from "../repositories/ticket.repository.js";
 import { EventRepository } from "../repositories/event.repository.js";
 import { generateTicketCode } from "../utils/ticketcode.js";
 import { sendTicketConfirmationEmail } from "../services/email.service.js";
+import { TicketDTO } from "../dto/ticket.dto.js";
 
 const VALID_STATUSES = ["active", "cancelled"];
 
@@ -77,7 +78,7 @@ export class TicketService {
 
     sendTicketConfirmationEmail(user.email, user.first_name, event.title, code).catch(error => {console.error("Error al enviar email de confirmación:", error)});
 
-    return ticket;
+    return new TicketDTO(ticket);
   }
 
   async getTicketById(id) {
@@ -89,7 +90,7 @@ export class TicketService {
       throw businessError("Ticket no encontrado", 404);
     }
 
-    return ticket;
+    return new TicketDTO(ticket);
   }
 
   async getTickets(query, user) {
@@ -126,7 +127,7 @@ export class TicketService {
     ]);
 
     return {
-      data,
+      data: data.map(ticket => new TicketDTO(ticket)),
       page: currentPage,
       limit: currentLimit,
       total,
@@ -168,7 +169,7 @@ export class TicketService {
     ]);
 
     return {
-      data,
+      data: data.map(ticket => new TicketDTO(ticket)),
       page: currentPage,
       limit: currentLimit,
       total,
@@ -203,9 +204,11 @@ export class TicketService {
       throw businessError("No se puede cancelar un ticket de un evento que ya ha pasado");
     }
 
-    return this.ticketRepository.updateById(id, {
+    const updatedTicket = await this.ticketRepository.updateById(id, {
       status: "cancelled",
       cancelledAt: new Date()
     });
+
+    return new TicketDTO(updatedTicket);
   }
 }

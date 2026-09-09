@@ -5,8 +5,8 @@ class UserRepository {
     this.dao = new UserDAO();
   }
 
-  async getAll(){
-    return await this.dao.findAll();
+  async getAll(filter = {}){
+    return await this.dao.findAll(filter);
   }
 
   async getByEmail(email) {

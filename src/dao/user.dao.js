@@ -1,8 +1,8 @@
 import User from "../models/user.model.js"
 
 export class UserDAO {
-	async findAll(){
-		return await User.find();
+	async findAll(filter = {}){
+		return await User.find(filter);
 	}
 
 	async findByEmail(email) {

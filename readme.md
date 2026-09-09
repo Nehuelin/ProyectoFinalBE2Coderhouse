@@ -1,4 +1,4 @@
-# Proyecto Final Coderhouse - Backend II (Pre-Entrega 7)
+# Proyecto Final Coderhouse - Backend II (Pre-Entrega 8)
 
 ## Nombre del Proyecto
 ParkEvent Solutions
@@ -14,6 +14,7 @@ ParkEvent Solutions
 - [Ejecución](#ejecución)
   - [Desarrollo](#desarrollo)
 - [Estructura de carpetas](#estructura-de-carpetas)
+- [Arquitectura por capas](#arquitectura-por-capas)
 - [Rutas disponibles](#rutas-disponibles)
   - [Estados posibles de un ticket](#estados-posibles-de-un-ticket)
   - [Flujo de inscripción / compra de ticket](#flujo-de-inscripción--compra-de-ticket)
@@ -160,6 +161,113 @@ Tambien se puede probar en apps dedicadas a endpoints como Insomnia o Postman. P
 ├── package.json         
 └── package-lock.json   
 ```
+
+## Arquitectura por capas
+
+El backend utiliza una arquitectura por capas para separar las responsabilidades de la aplicación. Cada capa se ocupa de un tipo de tarea y se comunica principalmente con la capa inmediata siguiente. Esto facilita el mantenimiento, permite reutilizar la lógica y evita que las rutas o los controladores contengan operaciones directas sobre la base de datos.
+
+### Flujo general de una petición
+
+Una petición HTTP sigue normalmente este recorrido:
+
+```text
+Cliente
+  -> Routes
+  -> Middlewares
+  -> Controllers
+  -> Services
+  -> Repositories
+  -> DAOs
+  -> Models / MongoDB
+```
+
+La respuesta vuelve por el mismo recorrido en sentido inverso. Los servicios aplican las reglas de negocio y los controladores se encargan de transformar el resultado en una respuesta HTTP.
+
+### Capas y responsabilidades
+
+#### Servidor y aplicación
+
+- `src/server.js` es el punto de entrada, ya que obtiene el puerto configurado y comienza a escuchar peticiones HTTP.
+- `src/app.js` crea la aplicación Express, registra parsers, cookies, Passport, conexión a MongoDB, rutas y manejadores de errores.
+- Esta capa NO contiene las reglas de negocio de las entidades del sistema.
+
+#### Rutas (`src/routes`)
+
+Definen los endpoints disponibles y relacionan cada método HTTP con su controlador. También indican qué middlewares deben ejecutarse antes de llegar al controlador.
+
+Ejemplo: las rutas de eventos conectan `GET /api/events` con el controlador de eventos y protegen las operaciones de creación o modificación según el rol del usuario.
+
+#### Middlewares (`src/middlewares`)
+
+Son funciones que intervienen durante el procesamiento de una petición. En este proyecto se utilizan para:
+
+- autenticar al usuario mediante Passport y la cookie JWT;
+- autorizar el acceso según roles (`user`, `organizer` o `admin`);
+- centralizar el tratamiento de errores.
+
+Los middlewares pueden detener la petición si, por ejemplo, la sesión no es válida o si el usuario no tiene permisos suficientes.
+
+#### Controladores (`src/controllers`)
+
+Reciben `req` y `res`, extraen parámetros, body o query strings, invocan al servicio correspondiente y construyen la respuesta HTTP.
+
+Por ejemplo, `event.controller.js` llama a `EventService` para crear, consultar o actualizar eventos y luego devuelve el resultado con el estado HTTP adecuado.
+
+#### Servicios (`src/services`)
+
+Contienen la lógica de negocio y las validaciones propias del dominio. Esta capa decide qué operaciones están permitidas y en qué orden deben ejecutarse.
+
+Entre sus responsabilidades se encuentran:
+
+- validar IDs, estados, fechas, cantidades y datos obligatorios;
+- comprobar permisos y propiedad de recursos;
+- validar que una categoría esté activa antes de asociarla a un evento;
+- comprobar cupos y evitar reservas duplicadas;
+- coordinar varias operaciones, como crear un ticket y enviar su email de confirmación;
+- preparar la información que se devolverá mediante DTOs.
+
+#### Repositorios (`src/repositories`)
+
+Funcionan como una abstracción de persistencia entre los servicios y los DAOs. Exponen operaciones relacionadas con el dominio sin obligar al servicio a conocer la implementación concreta de la base de datos.
+
+Esta capa también permite reemplazar o modificar la estrategia de persistencia sin cambiar la lógica de negocio.
+
+#### DAOs (`src/dao`)
+
+Los Data Access Objects realizan las operaciones concretas sobre Mongoose. Construyen las consultas, aplican filtros, paginación, ordenamiento, `populate`, agregaciones y actualizaciones sobre los modelos.
+
+Por ejemplo, `event.dao.js` consulta eventos, incorpora la categoría y el organizador relacionados, y aplica los parámetros de paginación recibidos desde el repositorio.
+
+#### Modelos (`src/models`)
+
+Definen los esquemas de Mongoose y representan las colecciones de MongoDB. Especifican diferentes propiedades de las entidades como los campos, tipos, valores por defecto, enums y referencias entre entidades.
+
+Las entidades principales son `User`, `Category`, `Event` y `Ticket`.
+
+#### DTOs (`src/dto`)
+
+Los Data Transfer Objects definen la forma de los datos que se exponen fuera de la capa de persistencia. Seleccionan los campos públicos de cada entidad y evitan devolver directamente documentos de Mongoose con información interna o detalles innecesarios.
+
+#### Configuración y utilidades
+
+- `src/config` contiene la conexión a MongoDB, la configuración de Nodemailer y las estrategias de Passport.
+- `src/utils` reúne funciones reutilizables, como hash de contraseñas, generación y validación de JWT, normalización de emails, códigos de tickets y errores.
+- Estas funciones apoyan a los servicios y middlewares sin asumir responsabilidades propias de las otras capas.
+
+### Criterio de separación
+
+Cada capa debe mantener una responsabilidad concreta:
+
+- las rutas conectan endpoints;
+- los middlewares controlan el acceso y el procesamiento transversal;
+- los controladores manejan HTTP;
+- los servicios contienen el negocio;
+- los repositorios abstraen la persistencia;
+- los DAOs ejecutan consultas;
+- los modelos definen los datos;
+- los DTOs controlan la información expuesta.
+
+De esta forma, una modificación en una consulta de MongoDB queda localizada en el DAO, mientras que una modificación de una regla de reserva queda localizada en el servicio de tickets.
 
 ## Rutas disponibles
 

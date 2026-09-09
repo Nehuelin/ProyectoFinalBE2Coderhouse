@@ -47,4 +47,24 @@ export class TicketDAO {
     ]);
     return result[0]?.totalReserved || 0;
   }
+
+  async getReservedQuantityByEvent(eventId) {
+    const result = await Ticket.aggregate([
+      {
+        $match: {
+          event: eventId,
+          status: 'active'
+        }
+      },
+      {
+        $group: {
+          _id: '$event',
+          totalReserved: {
+            $sum: '$quantity'
+          }
+        }
+      }
+    ])
+    return result[0]?.totalReserved || 0
+  }
 }

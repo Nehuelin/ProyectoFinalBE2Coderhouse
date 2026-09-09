@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 import { CategoryRepository } from "../repositories/category.repository.js";
+import { CategoryDTO } from "../dto/category.dto.js";
 
 const businessError = (message, statusCode = 400) => {
   return Object.assign(new Error(message), { status: statusCode, statusCode });
@@ -33,16 +34,19 @@ export class CategoryService {
     if (!name) throw businessError("El nombre de la categoría es obligatorio");
     if (!slug) throw businessError("El slug de la categoría es obligatorio");
 
-    return this.categoryRepository.create({
+    const category = await this.categoryRepository.create({
       name,
       slug,
       description: data.description,
       isActive: data.isActive ?? true
     });
+
+    return new CategoryDTO(category);
   }
 
   async getCategories() {
-    return this.categoryRepository.findAll({ isActive: true });
+    const categories = await this.categoryRepository.findAll({ isActive: true });
+    return categories.map(category => new CategoryDTO(category));
   }
 
   async getCategoryById(id) {
@@ -50,7 +54,7 @@ export class CategoryService {
     const category = await this.categoryRepository.findById(id, { isActive: true });
 
     if (!category) throw businessError("Categoría no encontrada", 404);
-    return category;
+    return new CategoryDTO(category);
   }
 
   async updateCategory(id, data) {
@@ -78,7 +82,8 @@ export class CategoryService {
       throw businessError("No hay campos válidos para actualizar");
     }
 
-    return this.categoryRepository.updateById(id, updateData);
+    const updatedCategory = await this.categoryRepository.updateById(id, updateData);
+    return new CategoryDTO(updatedCategory);
   }
 
   async changeStatus(id, isActive) {
@@ -89,7 +94,7 @@ export class CategoryService {
 
     const category = await this.categoryRepository.updateById(id, { isActive });
     if (!category) throw businessError("Categoría no encontrada", 404);
-    return category;
+    return new CategoryDTO(category);
   }
 
   async deleteCategory(id) {

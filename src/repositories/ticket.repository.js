@@ -32,4 +32,9 @@ export class TicketRepository {
   getReservedTicketsCount(eventId) {
     return this.dao.getReservedTicketsCount(eventId);
   }
+
+  getReservedQuantity(eventId) {
+    return this.dao.getReservedQuantityByEvent(eventId);
+  }
+
 }
